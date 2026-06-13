@@ -32,7 +32,15 @@ jackal_velocity_controller:
     open_loop: false
     enable_odom_tf: false
 
-    cmd_vel_timeout: 0.25
+    # Must exceed the slowest planner's control period or the base halts between
+    # commands and the robot stutters. SICNav at a 5-human crowd solves at ~2 Hz
+    # (~0.5 s) and the bridge publishes one cmd_vel per solve, so at the stock
+    # 0.25 s the controller timed out and zeroed velocity for ~half of every cycle
+    # -> ground speed collapsed to ~0.14 m/s (commanded 0.32) and the lagging odom
+    # fed back into the MPC's acceleration limit, pinning the command low. 1.0 s
+    # comfortably covers the 0.8 s bridge action timeout; benign for fast planners
+    # (commands arrive every <0.1 s, so it never triggers in normal operation).
+    cmd_vel_timeout: 1.0
     use_stamped_vel: true
 
     publish_cmd: true
