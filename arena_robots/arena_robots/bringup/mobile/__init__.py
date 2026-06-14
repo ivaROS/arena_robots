@@ -15,6 +15,13 @@ def _load_test_collision() -> type[Bringup]:
     return TestCollisionBringup
 
 
+@BRINGUPS["mobile"].register("collision-benchmark")
+def _load_collision_benchmark() -> type[Bringup]:
+    from .collision_benchmark import CollisionBenchmarkBringup
+
+    return CollisionBenchmarkBringup
+
+
 @BRINGUPS["mobile"].register("none")
 def _load_none() -> type[Bringup]:
     from .none import NoneBringup
