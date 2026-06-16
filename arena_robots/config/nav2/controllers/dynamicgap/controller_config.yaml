@@ -1,0 +1,68 @@
+# Dynamic Gap local planner (nav2_core::Controller plugin from the `dynamic_gap` package).
+#
+# Select it for a run with:   mobile.local_planner:=dynamicgap
+# (the name must be underscore-free: Arena's planner resolver matches the lowercased plugin
+#  class suffix "DynamicGapController", so "dynamicgap" resolves but "dynamic_gap" cannot.)
+#
+# This block is merged into controller_server.ros__parameters in nav2.yaml via the
+# ${controller_plugins} / ${**controller_plugins_dict} substitution. All params live under the
+# "FollowPath" key, which becomes the controller's ROS param namespace (DynamicGapConfig reads
+# them as FollowPath.<name>).
+controller_plugins:
+  - FollowPath
+controller_plugins_dict:
+  FollowPath:
+    plugin: "dynamic_gap::DynamicGapController"
+
+    # --- Topics (relative to the controller_server's robot namespace) ---
+    scan_topic: "lidar"            # Arena/Jackal laser scan (sensor_msgs/LaserScan)
+    odom_topic: "odom"             # Arena relays the robot odom here (nav_msgs/Odometry)
+    acc_topic: ""                  # Arena has no accel topic -> derive acceleration from odom
+    ped_topic: "../arena_peds"     # arena_people_msgs/Pedestrians (published one namespace up)
+
+    # --- Frames ---
+    # robot_frame_id and odom_frame_id are taken from the local costmap during configure().
+    # sensor_frame_id is taken from the first laser scan. Only the (shared) map frame is set here.
+    map_frame_id: "map"
+
+    # --- Robot kinematics (bound to Arena's per-robot kinematics; Jackal defaults shown) ---
+    robot_radius: 0.2
+    max_vel_x: ${max_linear_vel:-0.5}
+    max_vel_y: 0.0
+    max_vel_theta: ${max_angular_vel:-1.9}
+    holonomic: false
+
+    # --- Planning / behaviour toggles (see DynamicGapConfig.h) ---
+    gap_prop: 1                    # 1 = gap-tube propagation (current method)
+    pursuit_guidance_method: 1     # 1 = parallel navigation
+    future_scan_propagation: true
+    egocircle_prop_cheat: false
+    projection_operator: true
+    gap_feasibility_check: true
+    perfect_gap_models: false      # keep false (PerfectEstimator path is not wired for ROS 2)
+
+    # --- Control mode (exactly one true) ---
+    man_ctrl: false
+    mpc_ctrl: false
+    feedback_ctrl: true
+    ctrl_ahead_pose: 2
+
+    # --- Goal tolerances ---
+    xy_goal_tolerance: 0.25
+    yaw_goal_tolerance: 3.14159
+    xy_waypoint_tolerance: 0.1
+
+    # --- Trajectory generation / scoring ---
+    integrate_maxt: 5.0
+    integrate_stept: 0.5
+    inf_ratio: 1.5
+
+    # --- Gap point estimation (Kalman filter) and live-tunable control limits ---
+    # (declared by DynamicGapController; replaces the ROS 1 dynamic_reconfigure servers)
+    estimation:
+      Q: 0.01
+      R: 0.01
+    control:
+      linear_vel_x: 0.0
+      linear_vel_y: 0.0
+      angular_vel_z: 0.0
