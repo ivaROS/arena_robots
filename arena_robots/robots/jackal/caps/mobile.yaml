@@ -8,7 +8,11 @@ footprint: [[0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1]]
 polygons_dict:
   StopPolygon:
     type: polygon
-    points: [[0.3, 0.3], [0.3, -0.3], [-0.3, -0.3], [-0.3, 0.3]]
+    # Shrunk from +-0.3 to +-0.18 (just outside the footprint): the old box was wide
+    # enough that a gap-based planner threading ~0.3 m past a wall would trip a hard
+    # stop. The SlowPolygon (r=1.0) still slows the robot near walls; the StopPolygon
+    # now only fires on a near-imminent collision.
+    points: [[0.18, 0.18], [0.18, -0.18], [-0.18, -0.18], [-0.18, 0.18]]
     action_type: stop
     min_points: 4
     visualize: true

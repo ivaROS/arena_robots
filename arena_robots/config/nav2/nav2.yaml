@@ -136,20 +136,33 @@ local_costmap:
       height: 15
       resolution: 0.1
       footprint: ${footprint}
-      plugins: ["voxel_layer", "inflation_layer"]
+      plugins: ["stvl_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.55
-      voxel_layer:
-        plugin: "nav2_costmap_2d::VoxelLayer"
+      # Spatio-Temporal Voxel Layer (STVL): a near-native nav2 obstacle layer like
+      # VoxelLayer, except each voxel DECAYS after `voxel_decay` seconds without a
+      # fresh observation. With a flat 2D lidar, plain raytrace-clearing can't keep
+      # up with moving pedestrians, so their old positions smear into a persistent
+      # "wall" around the robot. Time-based decay expires those stale cells instead.
+      # `voxel_decay` is the key tunable: lower = clears moving obstacles faster.
+      stvl_layer:
+        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
         enabled: True
         publish_voxel_map: True
-        origin_z: 0.0
-        z_resolution: 0.05
-        z_voxels: 16
-        max_obstacle_height: 2.0
+        voxel_decay: 0.75            # s until an un-observed voxel fully decays
+        decay_model: 0              # 0=linear, 1=exponential, -1=persistent(=plain voxel)
+        voxel_size: 0.05
+        track_unknown_space: True
+        unknown_threshold: 15
         mark_threshold: 0
+        update_footprint_enabled: True
+        combination_method: 1
+        origin_z: 0.0
+        max_obstacle_height: 2.0
+        mapping_mode: False
+        transform_tolerance: 1.0
         observation_sources: ${observation_sources_string}
         "${**observation_sources_dict}": ''
       static_layer:
@@ -257,6 +270,15 @@ collision_monitor:
   ros__parameters:
     enabled: true
 
+    # Working baseline (what the default planner drives with): the monitor comes up active
+    # but effectively NON-BLOCKING because these costmap-shaped sources use data_type/
+    # min_obstacle_height keys it can't act on. Leave it as-is.
+    # WARNING: do NOT "fix" this into a real source (e.g. {type: scan, topic: lidar}) without
+    # also raising transform_tolerance (the tf-prefixed env_0/jackal/lidar_link->base_link
+    # transform fails at the default 0.2s; costmaps only cope via their 1.0e9 tolerance) and
+    # setting a non-zero stop_pub_timeout -- otherwise it false-stops and, with
+    # stop_pub_timeout: 0.0, stops publishing cmd_vel entirely, freezing the robot.
+    # Also: observation_sources MUST be non-empty -- `[]` throws InvalidParameterValue on start.
     observation_sources: ${observation_sources}
     ${**observation_sources_dict}: ''
     polygons: ${polygons}
@@ -275,7 +297,9 @@ collision_monitor:
     # 3) Timers & lifecycles
     use_sim_time:         true
     source_timeout:       0.0
-    stop_pub_timeout:     0.0
+    # Non-zero so a stop is a MOMENTARY halt that auto-resumes when the obstacle
+    # clears, instead of releasing /cmd_vel entirely (0.0) and hard-freezing the robot.
+    stop_pub_timeout:     1.0
     transform_tolerance:  0.2
     base_shift_correction: true
 

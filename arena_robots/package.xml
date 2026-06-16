@@ -33,6 +33,9 @@
   <exec_depend>nav2_velocity_smoother</exec_depend>
   <exec_depend>nav2_collision_monitor</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <!-- Spatio-Temporal Voxel Layer: time-decay obstacle layer for the local costmap
+       (clears moving pedestrians instead of smearing them into a persistent wall). -->
+  <exec_depend>spatio_temporal_voxel_layer</exec_depend>
   <exec_depend>topic_tools</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>nav2_mask_overlay_layer</exec_depend>
