@@ -270,17 +270,17 @@ collision_monitor:
   ros__parameters:
     enabled: true
 
-    # Working baseline (what the default planner drives with): the monitor comes up active
-    # but effectively NON-BLOCKING because these costmap-shaped sources use data_type/
-    # min_obstacle_height keys it can't act on. Leave it as-is.
-    # WARNING: do NOT "fix" this into a real source (e.g. {type: scan, topic: lidar}) without
-    # also raising transform_tolerance (the tf-prefixed env_0/jackal/lidar_link->base_link
-    # transform fails at the default 0.2s; costmaps only cope via their 1.0e9 tolerance) and
-    # setting a non-zero stop_pub_timeout -- otherwise it false-stops and, with
-    # stop_pub_timeout: 0.0, stops publishing cmd_vel entirely, freezing the robot.
-    # Also: observation_sources MUST be non-empty -- `[]` throws InvalidParameterValue on start.
-    observation_sources: ${observation_sources}
-    ${**observation_sources_dict}: ''
+    # Real safety source: the 2D lidar (relative topic resolves under this node's ns).
+    # The monitor transforms scan points into base_frame (needs the generous
+    # transform_tolerance below for the tf-prefixed env_0/jackal/lidar_link frame) and acts
+    # on StopPolygon (+-0.18 m, hard stop) / SlowPolygon (r=1.0 m, slowdown). With
+    # stop_pub_timeout: 1.0 a stop is a momentary, auto-resuming halt -- so this is now a
+    # genuinely-functioning safety gate, not the inert costmap-shaped passthrough.
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "lidar"
+      enabled: true
     polygons: ${polygons}
     ${**polygons_dict}: ''
 
@@ -300,7 +300,10 @@ collision_monitor:
     # Non-zero so a stop is a MOMENTARY halt that auto-resumes when the obstacle
     # clears, instead of releasing /cmd_vel entirely (0.0) and hard-freezing the robot.
     stop_pub_timeout:     1.0
-    transform_tolerance:  0.2
+    # Generous so the tf-prefixed lidar_link->base_link scan transform succeeds (the default
+    # 0.2 s fails here; the costmaps cope via 1.0e9). Without this the scan source can't
+    # transform and the monitor reverts to a passthrough (no safety).
+    transform_tolerance:  1.0
     base_shift_correction: true
 
 
