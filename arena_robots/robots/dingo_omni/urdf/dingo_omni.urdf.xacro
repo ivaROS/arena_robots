@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!--
+  Clearpath Dingo-Omni (mecanum, holonomic) for Arena / gz-sim (Jazzy, Harmonic).
+
+  Self-contained: the upstream Dingo meshes are an access-gated submodule, so the
+  chassis is a primitive box and the wheels are primitive cylinders. The drive is the
+  kinematic gz VelocityControl system (see dingo_omni.gazebo), which applies body-frame
+  (vx, vy, wz) directly, so plain cylinder wheels strafe reliably without mecanum-roller
+  friction modelling. Geometry matches the real Dingo-Omni (wheelbase 0.570, track
+  0.3708, wheel radius 0.050).
+-->
+<robot name="dingo_omni" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="sim_path" default=""/>
+
+  <xacro:property name="PI" value="3.1415926535897931"/>
+
+  <!-- Dingo-Omni geometry -->
+  <xacro:property name="wheelbase"    value="0.570"/>   <!-- front<->rear wheel centres -->
+  <xacro:property name="track"        value="0.3708"/>  <!-- left<->right wheel hubs -->
+  <xacro:property name="wheel_radius" value="0.050"/>
+  <xacro:property name="wheel_width"  value="0.050"/>
+  <xacro:property name="wheel_mass"   value="0.4"/>
+  <xacro:property name="wheel_y"      value="${track/2 + wheel_width/2}"/>
+
+  <!-- Chassis box (primitive stand-in for the omni_chassis mesh). base_link is at
+       wheel-axle height; the box sits above the wheels so it never clips the floor. -->
+  <xacro:property name="chassis_x"    value="0.66"/>
+  <xacro:property name="chassis_y"    value="0.43"/>
+  <xacro:property name="chassis_z"    value="0.18"/>
+  <xacro:property name="chassis_zoff" value="0.12"/>
+
+  <material name="dingo_yellow"><color rgba="0.85 0.75 0.05 1.0"/></material>
+  <material name="dingo_black"><color rgba="0.15 0.15 0.15 1.0"/></material>
+
+  <!-- ============================ base / chassis ============================ -->
+  <link name="base_link"/>
+
+  <joint name="chassis_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="chassis_link">
+    <visual>
+      <origin xyz="0 0 ${chassis_zoff}" rpy="0 0 0"/>
+      <geometry><box size="${chassis_x} ${chassis_y} ${chassis_z}"/></geometry>
+      <material name="dingo_yellow"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${chassis_zoff}" rpy="0 0 0"/>
+      <geometry><box size="${chassis_x} ${chassis_y} ${chassis_z}"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 ${chassis_zoff}" rpy="0 0 0"/>
+      <mass value="14.0"/>
+      <inertia ixx="0.35498" ixy="0" ixz="0" iyy="0.7266" iyz="0" izz="1.0553"/>
+    </inertial>
+  </link>
+
+  <!-- ============================ mecanum wheels ============================ -->
+  <!-- Visual/collision only; the kinematic drive moves the base, not the wheels. -->
+  <xacro:macro name="wheel" params="prefix x y">
+    <link name="${prefix}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="dingo_black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <inertia ixx="0.0003234" ixy="0" ixz="0" iyy="0.0003234" iyz="0" izz="0.0004901"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_wheel" type="continuous">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel prefix="front_left"  x="${ wheelbase/2}" y="${ wheel_y}"/>
+  <xacro:wheel prefix="front_right" x="${ wheelbase/2}" y="${-wheel_y}"/>
+  <xacro:wheel prefix="rear_left"   x="${-wheelbase/2}" y="${ wheel_y}"/>
+  <xacro:wheel prefix="rear_right"  x="${-wheelbase/2}" y="${-wheel_y}"/>
+
+  <!-- ============================ sensors ============================ -->
+  <!-- Shared Arena macros: lidar (frame `lidar`) + imu (frame `imu_sensor_link`,
+       sensor `imu_sensor`), both fixed to base_link so they lump into it and the gz
+       sensor topics scope under base_link (matching mappings.yaml). -->
+  <xacro:include filename="$(find arena_robots)/config/urdf/sensors/default.xacro"/>
+  <xacro:arena_default_lidar parent_link="base_link"
+                             z_offset="0.30" update_rate="10" samples="720"
+                             min_angle="-2.35619" max_angle="2.35619"
+                             min_range="0.1" max_range="30.0"/>
+  <xacro:arena_default_imu parent_link="base_link" frame="imu_sensor_link"/>
+
+  <!-- ============================ gz-sim plugins ============================ -->
+  <xacro:include filename="$(find arena_robots)/robots/dingo_omni/urdf/dingo_omni.gazebo"/>
+
+</robot>

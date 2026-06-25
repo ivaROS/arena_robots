@@ -1,0 +1,59 @@
+odom_frame: odom
+sensor_frame: lidar
+radius: 0.40
+# Holonomic (mecanum) base. Setting this true makes arena_training build an
+# OmnidirectionalActionSpace [vx, vy, wz] (the `continuous.linear` range below is
+# applied to BOTH vx and vy) and makes the cmd_vel publisher emit linear.y.
+is_holonomic: true
+
+# Footprint of the Dingo-Omni chassis (~0.66 x 0.43 m), as a rectangle.
+footprint: [[0.33, 0.215], [0.33, -0.215], [-0.33, -0.215], [-0.33, 0.215]]
+
+polygons_dict:
+  StopPolygon:
+    type: polygon
+    points: [[0.33, 0.215], [0.33, -0.215], [-0.33, -0.215], [-0.33, 0.215]]
+    action_type: stop
+    min_points: 4
+    visualize: true
+    polygon_pub_topic: polygon_stop
+    enabled: true
+
+actions:
+  # Continuous action space. For a holonomic robot, `linear` bounds BOTH the forward
+  # (vx) and the strafe (vy) velocities; `angular` bounds yaw (wz).
+  continuous:
+    linear: {min: -1.0, max: 1.0}
+    angular: {min: -2.0, max: 2.0}
+  # Holonomic discrete primitives in the caps schema {linear, lateral, angular},
+  # where `lateral` is the body-frame strafe velocity (0 for a diff-drive robot).
+  # NOTE: rosnav's ROBOT_DEFINED *discretization* path can't yet consume these
+  # objects (see README) — continuous training is the supported path and is
+  # unaffected. These are authored correctly so they work once that path is fixed.
+  discrete:
+    - {name: move_forward,  linear:  0.30, lateral:  0.00, angular:  0.00}
+    - {name: move_backward, linear: -0.15, lateral:  0.00, angular:  0.00}
+    - {name: strafe_left,   linear:  0.00, lateral:  0.30, angular:  0.00}
+    - {name: strafe_right,  linear:  0.00, lateral: -0.30, angular:  0.00}
+    - {name: turn_left,     linear:  0.00, lateral:  0.00, angular:  0.50}
+    - {name: turn_right,    linear:  0.00, lateral:  0.00, angular: -0.50}
+    - {name: stop,          linear:  0.00, lateral:  0.00, angular:  0.00}
+
+laser:
+  angle:
+    min: -2.35619
+    max: 2.35619
+    increment: 0.00654497222
+  num_beams: 720
+  range: 30.0
+  update_rate: 10
+
+nav2:
+  planner_plugins:
+    - GridBased
+  planner_plugins_dict:
+    GridBased:
+      plugin: nav2_navfn_planner::NavfnPlanner
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true

@@ -1,0 +1,23 @@
+robot_model: dingo_omni
+base_frame: base_link
+# base_link sits at wheel-axle height; spawning at wheel_radius rests the wheels on
+# the ground. The drive is the kinematic gz VelocityControl system, which holds the
+# commanded body velocity each step (linear.z = 0), so the spawn height must already
+# be the resting height rather than a drop height.
+z_offset: 0.05
+sensors:
+  - name: lidar
+    type: laserscan
+    topic: ${namespace}/lidar
+    frame: lidar
+  - name: lidar_points
+    type: pointcloud
+    topic: ${namespace}/lidar/points
+    frame: lidar
+  - name: imu
+    type: imu
+    topic: ${namespace}/imu/data
+    frame: imu_sensor
+# No `control:` block -> gazebo_native (like WLP311D). The holonomic drive is the gz
+# VelocityControl system plugin in urdf/dingo_omni.gazebo; cmd_vel (ROS->gz) and odom
+# (gz->ROS) are bridged in mappings.yaml. is_holonomic is declared in caps/mobile.yaml.

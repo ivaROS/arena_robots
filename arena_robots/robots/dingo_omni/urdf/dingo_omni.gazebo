@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!--
+  gz-sim (Harmonic) plugins for dingo_omni. Holonomic drive without mecanum-roller
+  physics: VelocityControl applies the commanded body-frame velocity directly to the
+  base each step, so vx / vy / wz all produce motion (including pure sideways strafe).
+  OdometryPublisher provides odometry; PosePublisher feeds Arena's pose->TF.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:arg name="sim_path" default=""/>
+
+  <!-- Holonomic kinematic drive. Subscribes (default) to /model/<name>/cmd_vel
+       (gz.msgs.Twist, body frame). cmd_vel is bridged ROS->gz in mappings.yaml. -->
+  <gazebo>
+    <plugin filename="gz-sim-velocity-control-system"
+            name="gz::sim::systems::VelocityControl">
+    </plugin>
+  </gazebo>
+
+  <!-- Odometry from the base_link pose (planar). Publishes (default) to
+       /model/<name>/odometry, bridged gz->ROS as `odom`. -->
+  <gazebo>
+    <plugin filename="gz-sim-odometry-publisher-system"
+            name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <dimensions>2</dimensions>
+      <odom_publish_frequency>30</odom_publish_frequency>
+    </plugin>
+  </gazebo>
+
+  <!-- Ground-truth model pose; Arena turns this into the odom->base_link TF. -->
+  <gazebo>
+    <plugin filename="gz-sim-pose-publisher-system"
+            name="gz::sim::systems::PosePublisher">
+      <publish_model_pose>true</publish_model_pose>
+      <publish_link_pose>false</publish_link_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_sensor_pose>false</publish_sensor_pose>
+      <publish_nested_model_pose>true</publish_nested_model_pose>
+      <use_pose_vector_msg>false</use_pose_vector_msg>
+    </plugin>
+  </gazebo>
+
+  <!-- Visual materials; wheels kept low-friction so contact never fights the
+       kinematic base motion. -->
+  <gazebo reference="chassis_link"><material>Gazebo/Yellow</material></gazebo>
+
+  <gazebo reference="front_left_wheel_link">
+    <material>Gazebo/DarkGrey</material><mu1>0.1</mu1><mu2>0.1</mu2>
+  </gazebo>
+  <gazebo reference="front_right_wheel_link">
+    <material>Gazebo/DarkGrey</material><mu1>0.1</mu1><mu2>0.1</mu2>
+  </gazebo>
+  <gazebo reference="rear_left_wheel_link">
+    <material>Gazebo/DarkGrey</material><mu1>0.1</mu1><mu2>0.1</mu2>
+  </gazebo>
+  <gazebo reference="rear_right_wheel_link">
+    <material>Gazebo/DarkGrey</material><mu1>0.1</mu1><mu2>0.1</mu2>
+  </gazebo>
+
+</robot>

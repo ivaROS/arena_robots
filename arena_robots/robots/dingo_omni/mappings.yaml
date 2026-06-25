@@ -1,0 +1,42 @@
+# Gazebo (gz-sim) <-> ROS topic bridges for dingo_omni (gazebo_native drive).
+# {robot_name} and {world} are substituted at spawn time.
+
+# Odometry out of the gz OdometryPublisher system.
+- gz_topic: /model/{robot_name}/odometry
+  ros_topic: odom
+  ros_type: nav_msgs/msg/Odometry
+  gz_type: gz.msgs.Odometry
+  direction: '['
+
+# Velocity command into the gz VelocityControl system (body-frame vx, vy, wz).
+# Direction ']' = ROS -> gz. Planners / DRL publish geometry_msgs/Twist on `cmd_vel`.
+- gz_topic: /model/{robot_name}/cmd_vel
+  ros_topic: cmd_vel
+  ros_type: geometry_msgs/msg/Twist
+  gz_type: gz.msgs.Twist
+  direction: ']'
+
+# IMU + lidar sensors. The sensor links are fixed-jointed to base_link, so sdformat
+# lumps them into base_link and the gz sensor topics are scoped under base_link.
+- gz_topic: '{world}/model/{robot_name}/link/base_link/sensor/imu_sensor/imu'
+  ros_topic: imu/data
+  ros_type: sensor_msgs/msg/Imu
+  gz_type: gz.msgs.IMU
+  direction: '['
+- gz_topic: '{world}/model/{robot_name}/link/base_link/sensor/gpu_lidar/scan'
+  ros_topic: lidar
+  ros_type: sensor_msgs/msg/LaserScan
+  gz_type: gz.msgs.LaserScan
+  direction: '['
+- gz_topic: '{world}/model/{robot_name}/link/base_link/sensor/gpu_lidar/scan/points'
+  ros_topic: lidar/points
+  ros_type: sensor_msgs/msg/PointCloud2
+  gz_type: gz.msgs.PointCloudPacked
+  direction: '['
+
+# Ground-truth model pose -> Arena converts this to the odom->base_link TF.
+- gz_topic: /model/{robot_name}/pose
+  ros_topic: pose
+  ros_type: geometry_msgs/msg/PoseStamped
+  gz_type: gz.msgs.Pose
+  direction: '['
