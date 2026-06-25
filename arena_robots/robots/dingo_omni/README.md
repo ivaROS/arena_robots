@@ -4,6 +4,42 @@ Clearpath **Dingo-Omni** — a holonomic (mecanum, 4-wheel) mobile base — for 
 ROS 2 Jazzy / gz-sim (Harmonic). It is the omnidirectional sibling of the diff-drive
 `dingo` and is the first genuinely working holonomic robot in this workspace.
 
+## Using it (collaborators)
+
+`dingo_omni` ships in `ivaROS/Arena` (`jazzy`) and is self-contained — no extra mesh or
+submodule download (no `arena feature robots add` needed). To pick it up:
+
+```bash
+arena pull      # update Arena + submodules  (or: git -C src/Arena pull && git -C src/Arena submodule update --init --recursive)
+arena build     # rebuild so the new robot is discovered
+```
+
+Then select it with `robot:=dingo_omni`:
+
+```bash
+arena launch sim:=gazebo world:=map_empty robot:=dingo_omni       # simulate / teleop
+arena launch sim:=gazebo robot:=dingo_omni mobile:=nav2           # navigation
+```
+
+For DRL training, use `--robot dingo_omni`. **Continuous `[vx, vy, wz]` training and nav
+work out of the box — nothing extra is required.**
+
+### Discrete-action holonomic training (extra step)
+
+Only needed if you enable `action_space.discretization` (e.g. `strategy: robot_defined`).
+It relies on a rosnav-rl fix that is **not** in upstream `Arena-Rosnav/rosnav-rl`; the fix
+lives on the lab fork `ivaROS/rosnav-rl@jazzy` and is applied automatically by the training
+feature, which overrides `deps/rosnav_rl` after submodule init:
+
+```bash
+arena feature training install     # or: arena feature training update
+```
+
+> ⚠️ `arena pull` / a bare `git submodule update` re-pin `deps/rosnav_rl` to the upstream
+> commit and drop the fix. Re-run `arena feature training update` afterwards to re-apply it
+> (manual fallback: `git -C src/Arena/arena_training/deps/rosnav_rl fetch ivaros jazzy &&
+> git -C src/Arena/arena_training/deps/rosnav_rl checkout FETCH_HEAD`).
+
 ## What makes it holonomic
 
 - `caps/mobile.yaml` sets `is_holonomic: true`. Arena's training stack then builds an
