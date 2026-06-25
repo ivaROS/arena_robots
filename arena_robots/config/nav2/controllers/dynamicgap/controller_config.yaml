@@ -28,9 +28,9 @@ controller_plugins_dict:
     # --- Robot kinematics (bound to Arena's per-robot kinematics; Jackal defaults shown) ---
     robot_radius: 0.2
     max_vel_x: ${max_linear_vel:-0.5}
-    max_vel_y: 0.0
+    max_vel_y: ${max_lateral_vel:-0.0}
     max_vel_theta: ${max_angular_vel:-1.9}
-    holonomic: false
+    holonomic: ${is_holonomic:-false}
 
     # --- Planning / behaviour toggles (see DynamicGapConfig.h) ---
     gap_prop: 1                    # 1 = gap-tube propagation (current method)

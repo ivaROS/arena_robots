@@ -172,6 +172,11 @@ class Nav2KinematicsDerivedYAML(YAMLFileSubstitution):
         mobile = _load_mobile(path_str)
 
         out: dict[str, typing.Any] = {}
+
+        # Drive kinematics flag, so controller configs can switch holonomic mode
+        # per-robot via ${is_holonomic} (e.g. Dynamic Gap's `holonomic:` field).
+        out['is_holonomic'] = mobile.is_holonomic
+
         vel = mobile.velocity_limits
         if vel is not None:
             out['min_linear_vel'] = vel.linear.min

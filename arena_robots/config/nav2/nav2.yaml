@@ -61,7 +61,10 @@ controller_server:
     use_sim_time: True
     controller_frequency: 10.0
     min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.5
+    # Was 0.5 (a diff-drive value that zeroed the odom lateral velocity fed to the
+    # controller). Holonomic robots (e.g. dingo_omni) genuinely move sideways below
+    # 0.5 m/s, so keep this as small as the x/theta thresholds.
+    min_y_velocity_threshold: 0.001
     min_theta_velocity_threshold: 0.001
     progress_checker_plugin: "progress_checker"
     goal_checker_plugin: "goal_checker"
@@ -87,6 +90,28 @@ controller_server:
 controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: True
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: True
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    # Per-robot velocity/accel envelope from caps velocity_limits (arena_robots/nav2.py).
+    # The middle slot is the LATERAL (vy) axis: holonomic robots populate it via
+    # ${max_lateral_vel}/${lateral_acc}; diff-drive robots have no lateral caps key so it
+    # defaults to 0.0 (vy correctly pinned to zero). Without this block the smoother ran on
+    # nav2's diff-drive DEFAULTS (max_velocity/max_accel vy = 0.0), which silently clamped
+    # every strafe command to zero -> holonomic planners (e.g. Dynamic Gap holonomic mode)
+    # could never move the robot sideways.
+    max_velocity: ["${max_linear_vel:-0.5}", "${max_lateral_vel:-0.0}", "${max_angular_vel:-2.5}"]
+    min_velocity: ["${min_linear_vel:--0.5}", "${min_lateral_vel:-0.0}", "${min_angular_vel:--2.5}"]
+    max_accel: ["${linear_acc:-2.5}", "${lateral_acc:-0.0}", "${angular_acc:-3.2}"]
+    max_decel: ["${linear_decel:--2.5}", "${lateral_decel:-0.0}", "${angular_decel:--3.2}"]
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
+    odom_topic: "odom"
+    odom_duration: 0.1
 
 docking_server:
   ros__parameters:

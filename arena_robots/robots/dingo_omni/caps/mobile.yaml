@@ -6,6 +6,20 @@ radius: 0.40
 # applied to BOTH vx and vy) and makes the cmd_vel publisher emit linear.y.
 is_holonomic: true
 
+# Planner-facing velocity/acceleration envelope (what nav2 may sample), NOT the
+# hardware envelope. Mirrors jackal's [-0.5, 0.5] / [-1.5, 1.5] so a head-to-head
+# nav comparison is fair; `lateral` is the strafe envelope a holonomic planner
+# (e.g. Dynamic Gap with holonomic: true) commands. arena_robots/nav2.py exposes
+# these to controller configs as ${max_linear_vel}/${max_lateral_vel}/${max_angular_vel}.
+velocity_limits:
+  linear: [-0.5, 0.5]
+  angular: [-1.5, 1.5]
+  lateral: [-0.5, 0.5]
+acceleration_limits:
+  linear: 2.5
+  angular: 3.2
+  lateral: 2.5
+
 # Footprint of the Dingo-Omni chassis (~0.66 x 0.43 m), as a rectangle.
 footprint: [[0.33, 0.215], [0.33, -0.215], [-0.33, -0.215], [-0.33, 0.215]]
 
