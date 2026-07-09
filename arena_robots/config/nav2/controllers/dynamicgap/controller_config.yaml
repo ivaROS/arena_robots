@@ -25,6 +25,18 @@ controller_plugins_dict:
     # sensor_frame_id is taken from the first laser scan. Only the (shared) map frame is set here.
     map_frame_id: "map"
 
+    # --- Gap detection ---
+    # Bounded "egocircle" radius (m) for gap detection. Scan returns beyond this are treated as
+    # open/free space, which is what lets dynamic_gap form gaps BETWEEN agents (not just
+    # agent-to-wall). It reproduces the short-range, saturating lidar the original Arena-Rosnav
+    # fed dynamic_gap, and decouples detection from the physical sensor range (the raw lidar stays
+    # long-range for the costmap). Tune to your map: it should sit BEYOND your agents (so they stay
+    # visible) but INSIDE your walls (so walls saturate). Too small -> nearby agents get clipped to
+    # "free"; too large -> in a bounded room nothing saturates and between-agent gaps stop forming.
+    # 12.0 keeps Jackal (12 m lidar) unchanged and matches the validated dingo_omni behaviour.
+    # Set <= 0 to disable clamping (use raw ranges).
+    gap_detection_horizon: 12.0
+
     # --- Robot kinematics (bound to Arena's per-robot kinematics; Jackal defaults shown) ---
     robot_radius: 0.2
     max_vel_x: ${max_linear_vel:-0.5}
