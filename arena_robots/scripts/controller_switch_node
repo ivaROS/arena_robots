@@ -1,0 +1,2 @@
+#!/usr/bin/env python3
+from arena_robots.controller_switch import main; main()

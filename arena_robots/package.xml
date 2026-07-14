@@ -21,6 +21,12 @@
 
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
+  <!-- controller_switch node (hybrid local planner): reads pedestrian tracks + TF and
+       publishes the active controller id to controller_selector. -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>arena_people_msgs</exec_depend>
   <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>action_msgs</exec_depend>
   <exec_depend>nav2_common</exec_depend>

@@ -1,0 +1,45 @@
+<!--
+  Hybrid behavior tree: identical to the Arena default (time-based replanning at 4 Hz +
+  clear/spin/wait/back-up recovery), with ONE addition for runtime controller switching.
+
+  A ControllerSelector node ticks every iteration of the NavigateWithReplanning pipeline. It
+  subscribes to the `controller_selector` topic (std_msgs/String, relative to bt_navigator ->
+  resolves under the robot namespace) and writes the received name onto the `selected_controller`
+  blackboard key. FollowPath then runs whichever controller id that key holds. Until the first
+  message arrives it uses default_controller="DynamicGap".
+
+  Publisher: the `controller_switch` node (arena_robots), launched automatically when
+  mobile.local_planner:=hybrid. It publishes "DynamicGap" or "SICNav" based on nearest-ped
+  distance. The controller ids MUST match the plugin keys in controllers/hybrid/controller_config.yaml.
+-->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <ControllerSelector selected_controller="{selected_controller}" default_controller="DynamicGap" topic_name="controller_selector"/>
+        <RateController hz="4.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="{selected_controller}"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+      </PipelineSequence>
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <RoundRobin name="RecoveryActions">
+          <Sequence name="ClearingActions">
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+          <Spin spin_dist="1.57"/>
+          <Wait wait_duration="5"/>
+          <BackUp backup_dist="0.30" backup_speed="0.05"/>
+        </RoundRobin>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

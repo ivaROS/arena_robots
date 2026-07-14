@@ -1,0 +1,106 @@
+# Hybrid local planner: loads TWO nav2_core::Controller plugins in one controller_server
+# and switches between them at runtime.
+#
+#   DynamicGap  -> dynamic_gap::DynamicGapController              (geometric egocircle gap follower)
+#   SICNav      -> nav2py_sicnav_controller::SicnavController     (interactive-crowd MPC, CasADi/IPOPT)
+#
+# Select it for a run with:
+#     mobile:=nav2 mobile.local_planner:=hybrid mobile.inter_planner:=hybrid
+#
+# BOTH args are required and paired:
+#   - local_planner:=hybrid loads this file (both controller plugins).
+#   - inter_planner:=hybrid loads the behavior tree that contains a ControllerSelector node,
+#     which reads the active controller id from the `controller_selector` topic and feeds it
+#     to FollowPath as controller_id. Without the hybrid BT, the default tree pins
+#     controller_id="FollowPath" and no switching happens.
+#
+# The runtime selection is driven by the `controller_switch` node (launched automatically in
+# hybrid mode by nav2.launch.py): it thresholds the nearest-pedestrian distance and publishes
+# "DynamicGap" or "SICNav" (std_msgs/String) to <robot_ns>/controller_selector.
+#
+# Both plugin bodies are merged into controller_server.ros__parameters in nav2.yaml via the
+# ${controller_plugins} / ${**controller_plugins_dict} substitution. Each plugin's params live
+# under its OWN key (DynamicGap.*, SICNav.*), which becomes that controller's ROS param
+# namespace. controller_server only calls computeVelocityCommands() on the controller whose id
+# matches the active FollowPath goal, so only the selected one plans.
+#
+# NOTE on SICNav + pedestrians: the SicnavController bridge builds its "human" agents by
+# clustering the laser scan (process_laserscan in nav2py_sicnav_controller/__main__.py), NOT from
+# the ground-truth arena_peds stream. Its MPC then does genuine model-based avoidance of those
+# DETECTED agents (2 s motion extrapolation + ORCA/IPOPT constraints). This is realistic
+# (non-privileged) perception. To instead feed ground-truth tracks, wire arena_peds into the
+# bridge's human_states (see README).
+controller_plugins:
+  - DynamicGap
+  - SICNav
+controller_plugins_dict:
+  DynamicGap:
+    plugin: "dynamic_gap::DynamicGapController"
+
+    # --- Topics (relative to the controller_server's robot namespace) ---
+    scan_topic: "lidar"            # Arena/Jackal laser scan (sensor_msgs/LaserScan)
+    odom_topic: "odom"             # Arena relays the robot odom here (nav_msgs/Odometry)
+    acc_topic: ""                  # Arena has no accel topic -> derive acceleration from odom
+    ped_topic: "../arena_peds"     # arena_people_msgs/Pedestrians (published one namespace up)
+
+    # --- Frames ---
+    # robot_frame_id and odom_frame_id are taken from the local costmap during configure().
+    # sensor_frame_id is taken from the first laser scan. Only the (shared) map frame is set here.
+    map_frame_id: "map"
+
+    # --- Gap detection ---
+    # Bounded "egocircle" radius (m) for gap detection. See the standalone dynamicgap config for
+    # the full rationale; 12.0 keeps Jackal (12 m lidar) unchanged. Set <= 0 to use raw ranges.
+    gap_detection_horizon: 12.0
+
+    # --- Robot kinematics (bound to Arena's per-robot kinematics; Jackal defaults shown) ---
+    robot_radius: 0.2
+    max_vel_x: ${max_linear_vel:-0.5}
+    max_vel_y: ${max_lateral_vel:-0.0}
+    max_vel_theta: ${max_angular_vel:-1.9}
+    holonomic: ${is_holonomic:-false}
+
+    # --- Planning / behaviour toggles (see DynamicGapConfig.h) ---
+    gap_prop: 1                    # 1 = gap-tube propagation (current method)
+    pursuit_guidance_method: 1     # 1 = parallel navigation
+    future_scan_propagation: true
+    egocircle_prop_cheat: false
+    projection_operator: true
+    gap_feasibility_check: true
+    perfect_gap_models: false      # keep false (PerfectEstimator path is not wired for ROS 2)
+
+    # --- Control mode (exactly one true) ---
+    man_ctrl: false
+    mpc_ctrl: false
+    feedback_ctrl: true
+    ctrl_ahead_pose: 2
+
+    # --- Goal tolerances ---
+    xy_goal_tolerance: 0.25
+    yaw_goal_tolerance: 3.14159
+    xy_waypoint_tolerance: 0.1
+
+    # --- Trajectory generation / scoring ---
+    integrate_maxt: 5.0
+    integrate_stept: 0.5
+    inf_ratio: 1.5
+
+    # --- Gap point estimation (Kalman filter) and live-tunable control limits ---
+    estimation:
+      Q: 0.01
+      R: 0.01
+    control:
+      linear_vel_x: 0.0
+      linear_vel_y: 0.0
+      angular_vel_z: 0.0
+
+  SICNav:
+    plugin: "nav2py_sicnav_controller::SicnavController"
+    # SICNav's C++ bridge reads odom from an ABSOLUTE topic (its default is hardcoded to the
+    # jackal namespace). Set it to the running robot's odom. For jackal this matches the standalone
+    # controllers/sicnav config; change the namespace for other robots.
+    odom_topic: "/task_generator_node/jackal/odom"
+    transform_tolerance: 0.1
+    # Remaining tunables use the C++ defaults (declare_parameter_if_not_declared in
+    # sicnav_controller.cpp): max_speed=0.5, max_angular_speed=1.0, neighbor_dist=5.0,
+    # time_horizon=5.0, smoothing_factor=0.3, safety_threshold=255.0. Override here if needed.

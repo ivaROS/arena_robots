@@ -50,6 +50,10 @@ def generate_launch_description():
     model_params_path = PathJoinSubstitution([
         robots_root, 'robots', robot.substitution, 'model_params.yaml'
     ])
+    # Robot base frame, used by the hybrid controller_switch node for its TF distance query.
+    base_frame_sub = YAMLRetrieveSubstitution(
+        YAMLFileSubstitution(model_params_path), 'base_frame'
+    )
     interplanner_cfg = nav2_cfg('interplanners', inter_planner.substitution, 'interplanner_config.yaml')
     interplanner_yaml = YAMLFileSubstitution(interplanner_cfg)
 
@@ -175,6 +179,31 @@ def generate_launch_description():
                     output='screen', parameters=[nav2_configured_params]
                 ),
             ]
+
+        # Hybrid local planner: launch the heuristic controller-switch node alongside the nav2
+        # stack. It publishes the active controller id (DynamicGap | SICNav) to the robot-namespaced
+        # `controller_selector` topic that the hybrid behavior tree's ControllerSelector consumes.
+        # Co-located here so it inherits the exact same namespace as bt_navigator/controller_server.
+        if not is_planner_only and local_planner.substitution.perform(context) == 'hybrid':
+            switch_use_sim_time = (
+                use_sim_time.substitution.perform(context).strip().lower() in ('true', '1', 'yes')
+            )
+            nav2_nodes.append(
+                Node(
+                    package='arena_robots', executable='controller_switch_node',
+                    name='controller_switch', output='screen',
+                    parameters=[{
+                        'use_sim_time': switch_use_sim_time,
+                        'peds_topic': '../arena_peds',
+                        'selector_topic': 'controller_selector',
+                        'base_frame': base_frame_sub.perform(context),
+                        'default_controller': 'DynamicGap',
+                        'crowded_controller': 'SICNav',
+                        'enter_distance': 2.0,
+                        'exit_distance': 3.0,
+                    }],
+                )
+            )
 
         bringup_cmd_group = GroupAction([
             *(SetRemap(src=r[0], dst=r[1]) for r in remappings),
