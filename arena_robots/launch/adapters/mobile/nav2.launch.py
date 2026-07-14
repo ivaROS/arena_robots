@@ -40,6 +40,9 @@ def generate_launch_description():
     inter_planner = LaunchArgument('inter_planner')
     train_mode = LaunchArgument('train_mode', default_value='false')
     planner_only = LaunchArgument('planner_only', default_value='false')
+    # Option B (mobile:=hybrid): route DynamicGap's output to cmd_vel_dgap and launch the
+    # controller_switch + cmd_vel_mux (which forwards the selected planner to the real cmd_vel).
+    hybrid_mux = LaunchArgument('hybrid_mux', default_value='false')
 
     def nav2_cfg(*parts):
         return PathJoinSubstitution([robots_root, 'config', 'nav2', *parts])
@@ -80,11 +83,14 @@ def generate_launch_description():
                 **task_generator_node.dict,
                 **env_namespace.dict,
                 'namespace': namespace.substitution,
-                # In train_mode the RL environment publishes cmd_vel directly.
-                # Redirect the collision_monitor output to a dead topic so it
-                # never overwrites the RL agent's velocity commands.
+                # collision_monitor output topic:
+                #  - train_mode: dead topic (RL env publishes cmd_vel directly);
+                #  - hybrid_mux: cmd_vel_dgap (the cmd_vel_mux forwards the selected planner to cmd_vel);
+                #  - otherwise: the normal cmd_vel.
                 'cmd_vel_out_topic': PythonExpression(
-                    ['"cmd_vel_sink" if "', train_mode.substitution, '" == "true" else "cmd_vel"']
+                    ['"cmd_vel_sink" if "', train_mode.substitution,
+                     '" == "true" else ("cmd_vel_dgap" if "', hybrid_mux.substitution,
+                     '" == "true" else "cmd_vel")']
                 ),
                 'default_nav_to_pose_bt_xml': retrieve('bt_navigator/ros__parameters/default_nav_to_pose_bt_xml'),
                 'default_nav_through_poses_bt_xml': retrieve('bt_navigator/ros__parameters/default_nav_through_poses_bt_xml'),
@@ -202,6 +208,39 @@ def generate_launch_description():
                         'enter_distance': 2.0,
                         'exit_distance': 3.0,
                     }],
+                )
+            )
+
+        # Option B (mobile:=hybrid, via HybridBringup passing hybrid_mux:=true):
+        # DynamicGap is the sole nav2 controller and its output was routed to cmd_vel_dgap
+        # (cmd_vel_out_topic above). The SICNav *bridge* runs as a separate async node (spawned by
+        # HybridAdapter) publishing cmd_vel_sicnav. Launch the controller_switch + cmd_vel_mux here
+        # so they share the robot namespace; the mux forwards the selected planner to cmd_vel.
+        if not is_planner_only and hybrid_mux.substitution.perform(context).strip().lower() in ('true', '1', 'yes'):
+            mux_use_sim_time = (
+                use_sim_time.substitution.perform(context).strip().lower() in ('true', '1', 'yes')
+            )
+            nav2_nodes.append(
+                Node(
+                    package='arena_robots', executable='controller_switch_node',
+                    name='controller_switch', output='screen',
+                    parameters=[{
+                        'use_sim_time': mux_use_sim_time,
+                        'peds_topic': '../arena_peds',
+                        'selector_topic': 'controller_selector',
+                        'base_frame': base_frame_sub.perform(context),
+                        'default_controller': 'DynamicGap',
+                        'crowded_controller': 'SICNav',
+                        'enter_distance': 2.0,
+                        'exit_distance': 3.0,
+                    }],
+                )
+            )
+            nav2_nodes.append(
+                Node(
+                    package='arena_robots', executable='cmd_vel_mux_node',
+                    name='cmd_vel_mux', output='screen',
+                    parameters=[{'use_sim_time': mux_use_sim_time}],
                 )
             )
 

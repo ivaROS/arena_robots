@@ -55,3 +55,10 @@ def _load_drl() -> type[Bringup]:
     from .drl import DrlBringup
 
     return DrlBringup
+
+
+@BRINGUPS["mobile"].register("hybrid")
+def _load_hybrid() -> type[Bringup]:
+    from .hybrid import HybridBringup
+
+    return HybridBringup
