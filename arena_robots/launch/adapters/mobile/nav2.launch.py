@@ -54,9 +54,16 @@ def generate_launch_description():
         robots_root, 'robots', robot.substitution, 'model_params.yaml'
     ])
     # Robot base frame, used by the hybrid controller_switch node for its TF distance query.
+    # NOTE: the raw model_params `base_frame` (e.g. "base_link") is NOT the runtime TF frame.
+    # nav2.yaml builds every consumer's frame as `${frame:-}${base_frame:-base_link}`, i.e. with
+    # the per-env `frame` prefix (e.g. "env_0/jackal/") prepended. The switch node must use the
+    # SAME prefixed frame or its TF lookup fails every tick and it can never leave DynamicGap.
     base_frame_sub = YAMLRetrieveSubstitution(
         YAMLFileSubstitution(model_params_path), 'base_frame'
     )
+
+    def _resolved_base_frame(context):
+        return frame.substitution.perform(context) + base_frame_sub.perform(context)
     interplanner_cfg = nav2_cfg('interplanners', inter_planner.substitution, 'interplanner_config.yaml')
     interplanner_yaml = YAMLFileSubstitution(interplanner_cfg)
 
@@ -202,7 +209,7 @@ def generate_launch_description():
                         'use_sim_time': switch_use_sim_time,
                         'peds_topic': '../arena_peds',
                         'selector_topic': 'controller_selector',
-                        'base_frame': base_frame_sub.perform(context),
+                        'base_frame': _resolved_base_frame(context),
                         'default_controller': 'DynamicGap',
                         'crowded_controller': 'SICNav',
                         'enter_distance': 2.0,
@@ -228,7 +235,7 @@ def generate_launch_description():
                         'use_sim_time': mux_use_sim_time,
                         'peds_topic': '../arena_peds',
                         'selector_topic': 'controller_selector',
-                        'base_frame': base_frame_sub.perform(context),
+                        'base_frame': _resolved_base_frame(context),
                         'default_controller': 'DynamicGap',
                         'crowded_controller': 'SICNav',
                         'enter_distance': 2.0,
