@@ -37,6 +37,7 @@ class HybridBringup(Nav2Bringup):
         global_planner: str = "navfn",
         task_generator_node: str = "",
         env_namespace: str = "",
+        switch_source: str = "heuristic",
         **_: object,
     ) -> list[Action]:
         # Same nav2 launch as Nav2Bringup, but forcing DynamicGap-only + the hybrid_mux substrate.
@@ -55,6 +56,10 @@ class HybridBringup(Nav2Bringup):
                     "local_planner": "dynamicgap",   # DynamicGap is the sole nav2 controller
                     "inter_planner": "default",       # no ControllerSelector BT; the mux arbitrates
                     "hybrid_mux": "true",             # DGap out -> cmd_vel_dgap; launch mux + switch
+                    # heuristic | external ("external" = an outside publisher, e.g. the
+                    # trained RL gate or arena_training's PlannerGateEnv, owns
+                    # `controller_selector`; the heuristic switch node is not launched)
+                    "switch_source": switch_source,
                     "task_generator_node": task_generator_node,
                     "env_namespace": env_namespace,
                 }.items(),

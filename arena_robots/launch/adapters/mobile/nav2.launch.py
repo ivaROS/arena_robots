@@ -43,6 +43,12 @@ def generate_launch_description():
     # Option B (mobile:=hybrid): route DynamicGap's output to cmd_vel_dgap and launch the
     # controller_switch + cmd_vel_mux (which forwards the selected planner to the real cmd_vel).
     hybrid_mux = LaunchArgument('hybrid_mux', default_value='false')
+    # Who publishes `controller_selector` (the hybrid arbitration signal):
+    #   heuristic -> the built-in nearest-pedestrian controller_switch node (default);
+    #   external  -> nobody here; an outside publisher owns the topic. Used by RL gate
+    #                training (arena_training's PlannerGateEnv publishes the selection)
+    #                and by any deployed learned gate node.
+    switch_source = LaunchArgument('switch_source', default_value='heuristic')
 
     def nav2_cfg(*parts):
         return PathJoinSubstitution([robots_root, 'config', 'nav2', *parts])
@@ -197,7 +203,15 @@ def generate_launch_description():
         # stack. It publishes the active controller id (DynamicGap | SICNav) to the robot-namespaced
         # `controller_selector` topic that the hybrid behavior tree's ControllerSelector consumes.
         # Co-located here so it inherits the exact same namespace as bt_navigator/controller_server.
-        if not is_planner_only and local_planner.substitution.perform(context) == 'hybrid':
+        use_heuristic_switch = (
+            switch_source.substitution.perform(context).strip().lower() != 'external'
+        )
+
+        if (
+            not is_planner_only
+            and use_heuristic_switch
+            and local_planner.substitution.perform(context) == 'hybrid'
+        ):
             switch_use_sim_time = (
                 use_sim_time.substitution.perform(context).strip().lower() in ('true', '1', 'yes')
             )
@@ -227,22 +241,26 @@ def generate_launch_description():
             mux_use_sim_time = (
                 use_sim_time.substitution.perform(context).strip().lower() in ('true', '1', 'yes')
             )
-            nav2_nodes.append(
-                Node(
-                    package='arena_robots', executable='controller_switch_node',
-                    name='controller_switch', output='screen',
-                    parameters=[{
-                        'use_sim_time': mux_use_sim_time,
-                        'peds_topic': '../arena_peds',
-                        'selector_topic': 'controller_selector',
-                        'base_frame': _resolved_base_frame(context),
-                        'default_controller': 'DynamicGap',
-                        'crowded_controller': 'SICNav',
-                        'enter_distance': 2.0,
-                        'exit_distance': 3.0,
-                    }],
+            # With switch_source:=external the mux still runs (it is the arbitration
+            # mechanism); only the heuristic publisher is omitted so an external
+            # publisher — e.g. the RL gate — owns `controller_selector`.
+            if use_heuristic_switch:
+                nav2_nodes.append(
+                    Node(
+                        package='arena_robots', executable='controller_switch_node',
+                        name='controller_switch', output='screen',
+                        parameters=[{
+                            'use_sim_time': mux_use_sim_time,
+                            'peds_topic': '../arena_peds',
+                            'selector_topic': 'controller_selector',
+                            'base_frame': _resolved_base_frame(context),
+                            'default_controller': 'DynamicGap',
+                            'crowded_controller': 'SICNav',
+                            'enter_distance': 2.0,
+                            'exit_distance': 3.0,
+                        }],
+                    )
                 )
-            )
             nav2_nodes.append(
                 Node(
                     package='arena_robots', executable='cmd_vel_mux_node',

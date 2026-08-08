@@ -42,6 +42,7 @@ class Nav2Bringup(Bringup):
         train_mode: bool = False,
         task_generator_node: str = "",
         env_namespace: str = "",
+        switch_source: str = "heuristic",
         **_: object,
     ) -> list[Action]:
         launch_file = PathJoinSubstitution(
@@ -65,6 +66,9 @@ class Nav2Bringup(Bringup):
                     "local_planner": local_planner,
                     "inter_planner": inter_planner,
                     "train_mode": str(train_mode).lower(),
+                    # Only meaningful with local_planner:=hybrid; "external" leaves
+                    # `controller_selector` to an outside publisher (e.g. an RL gate).
+                    "switch_source": switch_source,
                     "task_generator_node": task_generator_node,
                     "env_namespace": env_namespace,
                 }.items(),
